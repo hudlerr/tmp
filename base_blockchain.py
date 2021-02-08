@@ -64,10 +64,11 @@ class BlockChain:
 
         return True
 
-    def new_data(self, name, timestep, balance, data):
+    def new_data(self, name, timestep, collected_amt, balance, data):
         self.current_data.append({
             'name': name,
             'timestep': timestep,
+            'collected_amt': collected_amt,
             'balance': balance,
             'data': data
         })

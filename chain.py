@@ -11,6 +11,7 @@ def create_block(circle):
     block_data = blockchain.new_data(
         name = circle.name,
         timestep = circle.timestep,
+        collected_amt = circle.collected_amt,
         balance = circle.balance,
         data = circle.data
     )
@@ -18,6 +19,8 @@ def create_block(circle):
     last_hash = last_block.calculate_hash
     block = blockchain.construct_block(proof_no, last_hash)
 
-    print("Added block: " + str(block))
+    new_block = blockchain.latest_block
+    new_hash = new_block.calculate_hash
+    print("Added block: " + str(block.index) + ", hash - " + str(new_hash) + ", prev_hash - " + str(block.prev_hash) + ", timestep - " + str(circle.timestep))
 
     return block
