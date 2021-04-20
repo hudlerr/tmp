@@ -7,10 +7,66 @@ from chain import create_block
 from agents import (AgentData, update_contribution_amount, verify_allocated_amount, get_monthly_default_count, calculate_agent_amount)
 
 """
+    AGENT STATEGIES DEFINITION
+"""
+# three types of contributers
+def honest_contributer(reward, cost):
+    if(cost > reward): # contributes just as long as cost isnt greater than reward 
+       return False
+    else :
+        print("Honesty is the best policy")
+        return True    
+
+
+def influenced_contributer(reward, cost):
+    if((0.25 * cost) > reward): # gets discouraged from contributing if cost > 25% of reward
+       return False
+    else :
+        print("No ones stealing, Ill contribute!")
+        return True 
+
+def broke_contributer(reward, cost):       
+    if(random.random() < 0.1): # 10% chance this contributer doesn't have enough money to contribute
+       return False
+    else :
+        print("I have enough this month")
+        return True 
+
+# two types of 'cheater'
+def honest_allocator(reward, cost):   
+    if(cost > reward): # doesn't steal pot as long as cost isnt greater than reward 
+       return False
+    else :
+        print("Im honest")
+        return True    
+
+def greedy_allocator(reward, cost):   
+    risk = random.random()
+    if((reward > cost) or (risk < 0.5 and reward != 0)): # if reward is greater than cost or agent accepts risk of not being caught
+        return True
+    else:
+        print("nope risk to high: " + str(risk))
+        return False  
+
+"""
     GENESIS STATES
 """
+def assign_contributing_strategy(i):
+    """ ASSIGN CONTRIBUTING STRATEGY """
+    contributer_strategies = [honest_contributer, influenced_contributer, broke_contributer]
+    tmp = random.choice(contributer_strategies)
+    print("agent: " + str(i) + ". contrib: " + str(tmp))
+    return tmp
+
+def assign_allocating_strategy(i):
+    """ ASSIGN ALLOCATING POOL STRATEGY """
+    strategies = [honest_allocator, greedy_allocator]
+    tmp = random.choice(strategies)
+    print("agent: " + str(i) + ". alloc: " + str(tmp) + "\n")
+    return tmp
+
 def get_initial_deposits(n):
-    agent = [AgentData(secrets.token_bytes(48), 300, i, 0, False, 0, False, 0)
+    agent = [AgentData(secrets.token_bytes(48), 300, i, 0, False, 0, False, 0, assign_contributing_strategy(i), assign_allocating_strategy(i))
              for i in range(n)]       
     return agent
 
@@ -60,7 +116,7 @@ def p_intitiate_monthly_deposits(genesis_state):
             print("Contributer default: GBP" + str(agent_contribution))
 
     genesis_state['Total_Volume'] = expected_month_sum
-    genesis_state['Honest_Volume'] = month_sum
+    genesis_state['Honest_Volume'] += month_sum
     genesis_state['Dishonest_Volume'] = expected_month_sum - month_sum
 
     print("Total deposited amount: GBP" + str(genesis_state['Honest_Volume']) + " - Defaulted amount: " + str(genesis_state['Dishonest_Volume']))
@@ -89,14 +145,21 @@ def p_allocate_pool(state):
                 block_agent_data[x].taken = False
                 pool_amount = 0.0
 
+            # reset variables
+            previous_state['Cheaters_Cost'] = 0
+            previous_state['Cheats_Volume'] = 0  
+            previous_state['Cheater_Reward'] = 0
+
             # player decision - initiate cheater behaviour
             if(p_cheater(state, block_agent_data[x], allocation_amt) == True):
                 state['Contributers_Cost'] = contributer_cost(state)
                 state['Cheaters_On'] = True
                 print("Allocator default: GBP" + str(state['Cheater_Reward']))
-                block_agent_data[x].defaulted = True
+                block_agent_data[x].defaulted = True 
 
             block_agent_data[x].balance += allocation_amt
+        state['Honest_Volume'] = pool_amount
+
     return pool_amount
 
 """
@@ -108,14 +171,13 @@ def p_contributer(state, agent):
     cost = contributer_cost(state)
     reward = contributers_reward(agent, state)
 
-    contributer_strategies = [honest_contributer, influenced_contributer, broke_contributer]
-    choose_strategy = random.choice(contributer_strategies)
+    agent_strategy = agent.contribute_strategy
     
     if(agent.defaulted):
         return act
 
-    print("Shall I contribute? reward: " + str(reward) + " cost: " + str(0.25 * cost) + " strategy: " + str(choose_strategy))
-    if (choose_strategy(reward, cost)):
+    print("Shall I contribute? reward: " + str(reward) + " cost: " + str(0.25 * cost) + " strategy: " + str(agent_strategy))
+    if (agent_strategy(reward, cost)):
         act = True
         agent.rating += 0.2 # increase rating 
         state['Contributers_Rating'] += 0.2
@@ -130,56 +192,22 @@ def p_cheater(state, agent, allocation_amt):
     reward = cheater_reward(agent, allocation_amt)
     cost = cheater_cost(agent, allocation_amt)
 
-    strategies = [honest_allocator, greedy_allocator]
-    choose_strategy = random.choice(strategies)
-    print("Shall I steal? reward: " + str(reward) + " cost: " + str(cost) + " strategy: " + str(choose_strategy))
+    if(reward == 0): return act
 
-    if(choose_strategy(reward, cost)):
+    agent_strategy = agent.allocate_strategy
+
+    print("Shall I steal? reward: " + str(reward) + " cost: " + str(cost) + " strategy: " + str(agent_strategy))
+
+    if(agent_strategy(reward, cost)):
         print("YESSSS - YOLO")
         act = True
         state['Cheats_Volume'] += reward 
         state['Cheater_Reward'] = reward
         state['Cheaters_Cost'] = cost
+    else :
+        state['Contributers_Reward'] = reward    
 
     return act
-
-"""
-    AGENT STATEGIES DEFINITION
-"""
-
-# three types of contributers
-def honest_contributer(reward, cost):
-    if(cost > reward): # contributes just as long as cost isnt greater than reward 
-       return False
-    else :
-        return True    
-
-
-def influenced_contributer(reward, cost):
-    if((0.25 * cost) > reward): # gets discouraged from contributing if cost > 25% of reward
-       return False
-    else :
-        return True 
-
-def broke_contributer(reward, cost):       
-    if(random.random() < 0.1): # 10% chance this contributer doesn't have enough money to contribute
-       return False
-    else :
-        return True 
-
-# two types of 'cheater'
-def honest_allocator(reward, cost):   
-    if(cost > reward): # doesn't steal pot as long as cost isnt greater than reward 
-       return False
-    else :
-        return True    
-
-def greedy_allocator(reward, cost):   
-    risk = random.random()
-    if((reward > cost) and risk < 0.05): # if reward is greater than cost and agent accepts risk of not being caught
-        return True
-    else:
-        return False    
 
 """
     AGENT REWARD + COST DEFINITION
@@ -195,8 +223,11 @@ def contributer_cost(s):
 
 # Cheater's reward per cheat
 def cheater_reward(s, allocation_amt):
-    print("check allocation_amt: " + allocation_amt + " contributed: " + s.contributed_amt)
-    return allocation_amt - s.contributed_amt # Pot amount - Contributed amount
+    print("check allocation_amt: " + str(allocation_amt) + " contributed: " + str(s.contributed_amt))
+    if(s.contributed_amt >= allocation_amt):
+        return 0.0
+    else :    
+        return allocation_amt - s.contributed_amt # Pot amount - Contributed amount
 
 # Cheater's cost per cheat caught
 delta = 0.05

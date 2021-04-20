@@ -1,7 +1,7 @@
 # Contains anything Agent (participant) related
 
 class AgentData:
-    def __init__(self, pubkey, amount, standing, balance, taken, contributed_amt, defaulted, rating, contribute_strategy, allocate_strategy):
+    def __init__(self, pubkey, amount, standing, balance, taken, contributed_amt, defaulted, rating, contribute_strategy, allocate_strategy, borrowed):
         self.pubkey = pubkey
         self.amount = amount # amount agreed to contribute monthly
         self.standing = standing # standing within group, indicates your turn
@@ -12,6 +12,7 @@ class AgentData:
         self.defaulted = defaulted # whether agent has stolen pool
         self.contribute_strategy = contribute_strategy # contributing strategy (honest OR influenced OR broke)
         self.allocate_strategy = allocate_strategy # allocate strategy (honest OR greedy)
+        self.borrowed = borrowed # amount agent has/hasn't borrowed from pool
 
     def __str__(self):
         return str(self.__class__) + ": " + str(self.__dict__)    
@@ -28,10 +29,10 @@ def verify_allocated_amount(agent, allocated_amt, pool_amt):
     else :
         return False    
 
-def get_monthly_default_count(agent):
+def get_monthly_default_count(participants, agent):
     count = 0
-    for x in range(0, len(agent)):
-        if(agent[x].defaulted == True):
+    for x in range(0, len(participants)):
+        if(participants[agent].defaulted == True):
             count += 1
     return count    
 
